@@ -1,0 +1,46 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# Runtime state and private data
+data/
+models/
+backups/
+n8n_data/
+config/*.local.*
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated audio and model artifacts
+*.bin
+*.gguf
+*.onnx
+*.pt
+*.wav
+*.mp3
+*.ogg
+*.webm
+
+# JavaScript and Python build output
+**/node_modules/
+**/.next/
+**/.vinext/
+**/dist/
+**/.wrangler/
+**/__pycache__/
+**/.pytest_cache/
+**/coverage/
+*.pyc
+
+# Editor and operating-system files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~

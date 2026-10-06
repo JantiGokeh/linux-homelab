@@ -1,0 +1,122 @@
+{
+  "id": "VALWeatherCurr001",
+  "name": "Val - Current Weather",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+          "conditions": [
+            {
+              "id": "8bc9d865-e718-45d6-9564-33f17fc4461c",
+              "leftValue": "={{ Array.isArray($json.results) && $json.results.length > 0 }}",
+              "rightValue": "",
+              "operator": {"type": "boolean", "operation": "true", "singleValue": true}
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cf495d76-724e-4679-85b9-8d41bbc2f6bd",
+      "name": "Location Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "val-weather-current",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "2d9d8c4a-8fc2-4b80-b572-037762203bea",
+      "name": "Val Weather Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "webhookId": "26be75a3-f089-454e-a149-9444a274754a"
+    },
+    {
+      "parameters": {
+        "url": "https://geocoding-api.open-meteo.com/v1/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "name", "value": "={{ $json.body.location }}"},
+            {"name": "count", "value": "1"},
+            {"name": "language", "value": "en"},
+            {"name": "format", "value": "json"}
+          ]
+        },
+        "options": {}
+      },
+      "id": "9a74340f-e61f-4852-9f3e-2aaae7c3260a",
+      "name": "Resolve Location",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "latitude", "value": "={{ $json.results[0].latitude }}"},
+            {"name": "longitude", "value": "={{ $json.results[0].longitude }}"},
+            {"name": "current", "value": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m"},
+            {"name": "hourly", "value": "temperature_2m,weather_code,precipitation_probability"},
+            {"name": "forecast_hours", "value": "={{ $('Val Weather Webhook').item.json.body.hours }}"},
+            {"name": "temperature_unit", "value": "fahrenheit"},
+            {"name": "wind_speed_unit", "value": "mph"},
+            {"name": "timezone", "value": "auto"}
+          ]
+        },
+        "options": {}
+      },
+      "id": "75d374b7-b873-451c-9703-c5bd10774698",
+      "name": "Get Current Weather",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, -80]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, error: 'location_not_found' } }}",
+        "options": {"responseCode": 400}
+      },
+      "id": "692e9abf-56df-47a2-98b3-85fcf0dbe3cc",
+      "name": "Return Location Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [720, 120]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, latitude: $json.latitude, longitude: $json.longitude, timezone: $json.timezone, condition: ({ 0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast', 45: 'Fog', 48: 'Depositing rime fog', 51: 'Light drizzle', 53: 'Moderate drizzle', 55: 'Dense drizzle', 56: 'Light freezing drizzle', 57: 'Dense freezing drizzle', 61: 'Slight rain', 63: 'Moderate rain', 65: 'Heavy rain', 66: 'Light freezing rain', 67: 'Heavy freezing rain', 71: 'Slight snowfall', 73: 'Moderate snowfall', 75: 'Heavy snowfall', 77: 'Snow grains', 80: 'Slight rain showers', 81: 'Moderate rain showers', 82: 'Violent rain showers', 85: 'Slight snow showers', 86: 'Heavy snow showers', 95: 'Thunderstorm', 96: 'Thunderstorm with slight hail', 99: 'Thunderstorm with heavy hail' })[$json.current.weather_code] || 'Unknown', current: $json.current, current_units: $json.current_units, hourly: $json.hourly.time.map((time, index) => ({ time, condition: ({ 0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast', 45: 'Fog', 48: 'Depositing rime fog', 51: 'Light drizzle', 53: 'Moderate drizzle', 55: 'Dense drizzle', 56: 'Light freezing drizzle', 57: 'Dense freezing drizzle', 61: 'Slight rain', 63: 'Moderate rain', 65: 'Heavy rain', 66: 'Light freezing rain', 67: 'Heavy freezing rain', 71: 'Slight snowfall', 73: 'Moderate snowfall', 75: 'Heavy snowfall', 77: 'Snow grains', 80: 'Slight rain showers', 81: 'Moderate rain showers', 82: 'Violent rain showers', 85: 'Slight snow showers', 86: 'Heavy snow showers', 95: 'Thunderstorm', 96: 'Thunderstorm with slight hail', 99: 'Thunderstorm with heavy hail' })[$json.hourly.weather_code[index]] || 'Unknown', temperature_2m: $json.hourly.temperature_2m[index], precipitation_probability: $json.hourly.precipitation_probability[index] })), hourly_units: $json.hourly_units } }}",
+        "options": {}
+      },
+      "id": "37f96b3e-0f94-41dc-987a-e2eec159cfd8",
+      "name": "Return Weather",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [960, -80]
+    }
+  ],
+  "connections": {
+    "Val Weather Webhook": {"main": [[{"node": "Resolve Location", "type": "main", "index": 0}]]},
+    "Resolve Location": {"main": [[{"node": "Location Found", "type": "main", "index": 0}]]},
+    "Location Found": {"main": [[{"node": "Get Current Weather", "type": "main", "index": 0}], [{"node": "Return Location Error", "type": "main", "index": 0}]]},
+    "Get Current Weather": {"main": [[{"node": "Return Weather", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1", "availableInMCP": false},
+  "staticData": null,
+  "pinData": {},
+  "meta": {"templateCredsSetupCompleted": true},
+  "tags": []
+}

@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "tools": [
+    {
+      "name": "news.headlines",
+      "description": "Get current headlines, sources, short excerpts, and links from configured public news feeds. Results are saved to Explore in the Web UI.",
+      "endpoint": "http://val-controller:8092/explore/news",
+      "timeout_seconds": 20,
+      "permission": "read_only",
+      "confirmation_required": false,
+      "arguments": {}
+    },
+    {
+      "name": "web.search",
+      "description": "Search the public web for titles, links, and short excerpts. Results are saved to Explore in the Web UI. This tool does not open or read result pages.",
+      "endpoint": "http://val-controller:8092/explore/search",
+      "timeout_seconds": 20,
+      "permission": "read_only",
+      "confirmation_required": false,
+      "arguments": {
+        "query": {
+          "type": "string",
+          "required": true,
+          "max_length": 160
+        }
+      }
+    },
+    {
+      "name": "server.status",
+      "description": "Read the local server CPU sample, memory and root disk space, and known Docker container states. Snapshot updates once a minute. Running does not guarantee application health. Cannot change server state.",
+      "endpoint": "http://val-controller:8092/internal-server-status",
+      "timeout_seconds": 5,
+      "permission": "read_only",
+      "confirmation_required": false,
+      "arguments": {}
+    },
+    {
+      "name": "weather.current",
+      "description": "Get current conditions and the next six hourly forecast entries for a named location. If the user gives no location, use the configured default.",
+      "endpoint": "http://n8n:5678/webhook/val-weather-current",
+      "timeout_seconds": 15,
+      "permission": "read_only",
+      "confirmation_required": false,
+      "arguments": {
+        "location": {
+          "type": "string",
+          "required": false,
+          "max_length": 120,
+          "default": "New York, New York"
+        },
+        "hours": {
+          "type": "integer",
+          "required": false,
+          "minimum": 1,
+          "maximum": 6,
+          "default": 6
+        }
+      }
+    },
+    {
+      "name": "calendar.events",
+      "description": "Read events from the configured Google Calendar for a date range. Use start_offset_days 0 for today, 1 for tomorrow, and so on. Use days for the number of calendar days to retrieve.",
+      "endpoint": "http://n8n:5678/webhook/val-calendar-events",
+      "timeout_seconds": 20,
+      "permission": "read_only",
+      "confirmation_required": false,
+      "arguments": {
+        "start_offset_days": {
+          "type": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 30,
+          "default": 0
+        },
+        "days": {
+          "type": "integer",
+          "required": false,
+          "minimum": 1,
+          "maximum": 14,
+          "default": 1
+        }
+      }
+    }
+  ]
+}

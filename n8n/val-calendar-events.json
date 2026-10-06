@@ -1,0 +1,87 @@
+{
+  "id": "VALCalendarEvents001",
+  "name": "Val - Calendar Events",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "val-calendar-events",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c22c05be-c8d6-4f99-b7d9-01d10ce22719",
+      "name": "Val Calendar Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "webhookId": "b48f9c19-430d-43e8-b987-36d382b183a2"
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "url": "https://www.googleapis.com/calendar/v3/calendars/YOUR_URL_ENCODED_CALENDAR_ID/events",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "timeMin",
+              "value": "={{ $now.setZone('America/New_York').startOf('day').plus({ days: Number($('Val Calendar Webhook').item.json.body.start_offset_days || 0) }).toISO() }}"
+            },
+            {
+              "name": "timeMax",
+              "value": "={{ $now.setZone('America/New_York').startOf('day').plus({ days: Number($('Val Calendar Webhook').item.json.body.start_offset_days || 0) + Number($('Val Calendar Webhook').item.json.body.days || 1) }).toISO() }}"
+            },
+            {"name": "singleEvents", "value": "true"},
+            {"name": "orderBy", "value": "startTime"},
+            {"name": "maxResults", "value": "50"},
+            {"name": "timeZone", "value": "America/New_York"}
+          ]
+        }
+      },
+      "id": "407fa052-ab47-4ce2-905c-267247f81c80",
+      "name": "Get Calendar Events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Val Calendar Webhook').first().json.body || {};\nconst startOffsetDays = Number(body.start_offset_days || 0);\nconst days = Number(body.days || 1);\nconst events = ($json.items || []).map(event => ({\n  summary: event.summary || 'Untitled event',\n  start: event.start?.dateTime || event.start?.date || null,\n  end: event.end?.dateTime || event.end?.date || null,\n  all_day: Boolean(event.start?.date && !event.start?.dateTime),\n  location: event.location || null,\n  description: event.description || null,\n  status: event.status || null\n}));\nreturn [{ json: { ok: true, timezone: 'America/New_York', start_offset_days: startOffsetDays, days, count: events.length, events } }];"
+      },
+      "id": "47700102-5d4d-4758-a38c-e1b7af7b5c54",
+      "name": "Format Calendar Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "71261f0c-14c5-41ad-a4f7-e5d0c974d66d",
+      "name": "Return Calendar Events",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [720, 0]
+    }
+  ],
+  "connections": {
+    "Val Calendar Webhook": {"main": [[{"node": "Get Calendar Events", "type": "main", "index": 0}]]},
+    "Get Calendar Events": {"main": [[{"node": "Format Calendar Result", "type": "main", "index": 0}]]},
+    "Format Calendar Result": {"main": [[{"node": "Return Calendar Events", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/New_York",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": {},
+  "meta": {"templateCredsSetupCompleted": true},
+  "tags": []
+}

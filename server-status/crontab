@@ -1,0 +1,1 @@
+* * * * * /usr/bin/flock -n /tmp/val-server-status.lock /usr/bin/python3 /srv/val/server-status/collect_status.py >/dev/null 2>&1

@@ -1,0 +1,190 @@
+services:
+  val-model:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: val-model
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8091:8080"
+    volumes:
+      - ./models:/models:ro
+    command:
+      - -m
+      - /models/${VAL_MODEL_FILE:-Qwen3-4B-Instruct-2507-abliterated.Q4_K_M.gguf}
+      - -c
+      - "${VAL_MODEL_CONTEXT:-2048}"
+      - -t
+      - "${VAL_MODEL_THREADS:-3}"
+      - -tb
+      - "${VAL_MODEL_THREADS:-3}"
+      - --parallel
+      - "1"
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+    mem_limit: 3g
+
+  val-controller:
+    build:
+      context: ./controller
+    container_name: val-controller
+    restart: unless-stopped
+    depends_on:
+      - val-model
+    ports:
+      - "127.0.0.1:8092:8092"
+    volumes:
+      - ./config:/config:ro
+      - ./data:/data
+    devices:
+      - /dev/snd:/dev/snd
+    group_add:
+      - "29"
+    environment:
+      VAL_MODEL_URL: http://val-model:8080/v1/chat/completions
+      VAL_PERSONA_PATH: /config/persona.txt
+      VAL_TOOLS_PATH: /config/tools.json
+      VAL_MAX_TOKENS: "160"
+      VAL_TEMPERATURE: "0.7"
+      VAL_REQUEST_TIMEOUT_SECONDS: "120"
+      VAL_CONTEXT_MESSAGES: "6"
+      VAL_MAX_SESSIONS: "32"
+      VAL_DISABLE_THINKING: "false"
+      VAL_DATA_DIR: /data
+      VAL_LOCAL_TIMEZONE: ${VAL_LOCAL_TIMEZONE:-America/New_York}
+      VAL_SERVER_NAME: ${VAL_SERVER_NAME:-Val server}
+      VAL_OWNER_NAME: ${VAL_OWNER_NAME:-Owner}
+      VAL_DEFAULT_WEATHER_LOCATION: ${VAL_DEFAULT_WEATHER_LOCATION:-New York, New York}
+    mem_limit: 128m
+    networks:
+      - default
+      - n8n_internal
+
+  val-whisper:
+    image: ghcr.io/ggml-org/whisper.cpp:main
+    container_name: val-whisper
+    restart: unless-stopped
+    entrypoint:
+      - /app/build/bin/whisper-server
+    ports:
+      - "127.0.0.1:8093:8080"
+    volumes:
+      - ./models:/models:ro
+    command:
+      - -m
+      - /models/ggml-base.en.bin
+      - -t
+      - "3"
+      - --language
+      - en
+      - --prompt
+      - "Val, ${VAL_SERVER_NAME:-the local server}, n8n, Pi-hole."
+      - --carry-initial-prompt
+      - --no-timestamps
+      - --convert
+      - --no-gpu
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+    mem_limit: 512m
+
+  val-piper:
+    build:
+      context: ./tts
+    container_name: val-piper
+    restart: unless-stopped
+    entrypoint:
+      - python
+      - -m
+      - piper.http_server
+    ports:
+      - "127.0.0.1:8094:5000"
+    volumes:
+      - ./models:/models:ro
+    command:
+      - -m
+      - en_GB-alba-medium
+      - --data-dir
+      - /models
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+    mem_limit: 256m
+
+  val-voice:
+    build:
+      context: ./voice
+    container_name: val-voice
+    restart: unless-stopped
+    depends_on:
+      - val-controller
+      - val-whisper
+      - val-piper
+    devices:
+      - /dev/snd:/dev/snd
+    volumes:
+      - ./models:/models:ro
+    environment:
+      VAL_CAPTURE_DEVICE: ${VAL_CAPTURE_DEVICE:-default}
+      VAL_PLAYBACK_DEVICE: ${VAL_PLAYBACK_DEVICE:-default}
+      VAL_INPUT_GAIN: "${VAL_INPUT_GAIN:-1.0}"
+      VAL_WAKE_MODEL_DIR: /models/wake/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01
+      VAL_WHISPER_URL: http://val-whisper:8080/inference
+      VAL_CONTROLLER_URL: http://val-controller:8092/chat
+      VAL_VOICE_STATE_URL: http://val-controller:8092/voice-state
+      VAL_EVENTS_URL: http://val-controller:8092/events
+      VAL_PIPER_URL: http://val-piper:5000/
+      VAL_CAPTURE_PERCENT: "${VAL_CAPTURE_PERCENT:-65}"
+      VAL_VAD_MODEL: /models/vad/silero_vad.onnx
+      VAL_VAD_THRESHOLD: "0.50"
+      VAL_SLEEP_VAD_THRESHOLD: "0.25"
+      VAL_END_SILENCE_SECONDS: "0.8"
+      VAL_MIN_SPEECH_SECONDS: "0.35"
+      VAL_MAX_SPEECH_SECONDS: "20"
+      VAL_WAKE_SCORE: "6.0"
+      VAL_WAKE_THRESHOLD: "0.05"
+    mem_limit: 256m
+    command:
+      - python
+      - /app/val_voice.py
+
+  val-dashboard:
+    build:
+      context: ./val-dashboard
+    container_name: val-dashboard
+    restart: unless-stopped
+    depends_on:
+      - val-controller
+      - val-model
+      - val-whisper
+      - val-piper
+    ports:
+      - "${VAL_DASHBOARD_BIND:-127.0.0.1}:${VAL_DASHBOARD_PORT:-8090}:8090"
+    mem_limit: 512m
+
+  val-voice-test:
+    profiles:
+      - test
+    build:
+      context: ./voice
+    container_name: val-voice-test
+    depends_on:
+      - val-controller
+      - val-whisper
+      - val-piper
+    devices:
+      - /dev/snd:/dev/snd
+    environment:
+      VAL_AUDIO_DEVICE: plughw:0,0
+      VAL_RECORD_SECONDS: "5"
+      VAL_WHISPER_URL: http://val-whisper:8080/inference
+      VAL_CONTROLLER_URL: http://val-controller:8092/chat
+      VAL_PIPER_URL: http://val-piper:5000/
+    mem_limit: 128m
+
+networks:
+  n8n_internal:
+    external: true
+    name: n8n_default
